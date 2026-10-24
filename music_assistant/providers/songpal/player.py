@@ -305,7 +305,7 @@ class SongpalPlayer(Player):
             self._attr_volume_muted = volume.is_muted
 
             status = await self._device.get_power()
-            self._attr_powered = bool(status)
+            self._attr_powered = bool(status.status)
 
             inputs = await self._device.get_inputs()
             self._inputs = {}
@@ -350,6 +350,15 @@ class SongpalPlayer(Player):
         self._listen_task = task
         self._listen_tasks.add(task)
         task.add_done_callback(self._listen_tasks.discard)
+
+    def allow_listen(self) -> None:
+        """Allow a new notification listener after this player was unloaded."""
+        self._closing = False
+
+    async def on_unload(self) -> None:
+        """Stop notifications when the controller unregisters this player."""
+        await super().on_unload()
+        await self.close()
 
     async def close(self) -> None:
         """Stop the notification listener."""
@@ -527,22 +536,34 @@ class SongpalPlayer(Player):
             self._attr_playback_state = PlaybackState.PAUSED
         elif state_name == "idle":
             self._attr_playback_state = PlaybackState.IDLE
-        uri = info.uri or self._endpoint
-        self.set_current_media(
-            uri=uri,
-            media_type=MediaType.TRACK,
-            title=info.title,
-            artist=info.artist,
-            album=info.albumName,
-        )
-        if self._attr_current_media is not None:
-            self._attr_current_media.artist = info.artist
-            self._attr_current_media.album = info.albumName
-            if info.durationMsec:
-                self._attr_current_media.duration = int(info.durationMsec / 1000)
-        if info.positionMsec is not None:
-            self._attr_elapsed_time = info.positionMsec / 1000
-            self._attr_elapsed_time_last_updated = time.time()
+        # getPlayingContentInfo often has no title while AVTransport is playing.
+        # Keep the queue item; the SongPal endpoint is not a media URI.
+        if not info.title:
+            self._apply_elapsed(info)
+            return
+        uri = info.uri
+        if not uri and self._attr_current_media is not None:
+            uri = self._attr_current_media.uri
+        if uri:
+            self.set_current_media(
+                uri=uri,
+                media_type=MediaType.TRACK,
+                title=info.title,
+                artist=info.artist,
+                album=info.albumName,
+            )
+            if self._attr_current_media is not None:
+                self._attr_current_media.artist = info.artist
+                self._attr_current_media.album = info.albumName
+                if info.durationMsec:
+                    self._attr_current_media.duration = int(info.durationMsec / 1000)
+        self._apply_elapsed(info)
+
+    def _apply_elapsed(self, info: PlayInfo) -> None:
+        if info.positionMsec is None or self._attr_playback_state == PlaybackState.IDLE:
+            return
+        self._attr_elapsed_time = info.positionMsec / 1000
+        self._attr_elapsed_time_last_updated = time.time()
 
     def _apply_device_info(self) -> None:
         """Publish the MAC and IP so protocol players can link to this device.

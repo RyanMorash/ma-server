@@ -150,20 +150,25 @@ def replace_url_host(url: str, ip: str) -> str:
 
 
 def playback_state_name(state: str | None, *, is_idle: bool) -> str | None:
-    """Map a SongPal playback state to ``idle``, ``paused``, or ``playing``.
-
-    ``PlayInfo.is_idle`` (no title) is idle. ``None`` means the report did not
-    say, and the caller should keep the current state.
     """
-    if is_idle:
-        return "idle"
-    if not state:
-        return None
-    normalized = state.strip().upper()
+    Map a SongPal playback state to ``idle``, ``paused``, or ``playing``.
+
+    An explicit transport state wins. ``PlayInfo.is_idle`` only means the title
+    is missing, which is normal while AVTransport is playing, so a missing
+    title does not force idle. ``None`` means the report did not say, and the
+    caller should keep the current state.
+
+    :param state: SongPal ``stateInfo.state``, when the device sent one.
+    :param is_idle: True when the report has no title.
+    """
+    normalized = (state or "").strip().upper()
     if normalized in {"PLAYING", "STARTED"}:
         return "playing"
     if "PAUSE" in normalized:
         return "paused"
     if normalized in {"STOPPED", "STOP", "IDLE", "NO_MEDIA_PRESENT"}:
         return "idle"
+    # A missing title is not a transport state.
+    if is_idle or not normalized:
+        return None
     return None

@@ -116,7 +116,9 @@ class DiscoveryHelperTest(unittest.TestCase):
         self.assertEqual(playback_state_name("PLAYING", is_idle=False), "playing")
         self.assertEqual(playback_state_name("PAUSED_PLAYBACK", is_idle=False), "paused")
         self.assertEqual(playback_state_name("STOPPED", is_idle=False), "idle")
-        self.assertEqual(playback_state_name("PLAYING", is_idle=True), "idle")
+        self.assertEqual(playback_state_name("PLAYING", is_idle=True), "playing")
+        self.assertEqual(playback_state_name("STOPPED", is_idle=True), "idle")
+        self.assertIsNone(playback_state_name(None, is_idle=True))
         self.assertIsNone(playback_state_name(None, is_idle=False))
 
 

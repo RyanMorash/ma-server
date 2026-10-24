@@ -249,12 +249,24 @@ class SongpalPlayerProvider(PlayerProvider):
                 )
                 return
         if existing is not None:
+            # Disable unregisters the player, but this map keeps the instance.
+            # Register it again, and do not listen when it is still disabled.
+            needs_register = self.mass.players.get_player(player_id) is not existing
+            if needs_register:
+                existing.allow_listen()
             await existing.update_connection(
                 endpoint=device.endpoint,
                 control_url=control_url,
                 name=name,
                 ip_address=ip_address,
             )
+            if needs_register:
+                await self.mass.players.register(existing)
+                if self.mass.players.get_player(player_id) is existing:
+                    existing.update_state()
+                    await existing.start_listening()
+                else:
+                    await existing.close()
             return
         player = SongpalPlayer(
             self,
@@ -268,6 +280,8 @@ class SongpalPlayerProvider(PlayerProvider):
         await player.prepare()
         await self.mass.players.register(player)
         self._players[player_id] = player
+        if self.mass.players.get_player(player_id) is not player:
+            return
         player.update_state()
         await player.start_listening()
 
