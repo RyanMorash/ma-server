@@ -16,6 +16,7 @@ from music_assistant.providers.songpal.util import (
     playback_state_name,
     player_id_from_macs,
     replace_url_host,
+    same_url_host,
     select_main_zone,
 )
 
@@ -111,6 +112,14 @@ class DiscoveryHelperTest(unittest.TestCase):
             replace_url_host("http://192.168.1.10:8095/flow/1", "10.0.0.1"),
             "http://192.168.1.10:8095/flow/1",
         )
+
+    def test_upnp_location_must_share_the_songpal_host(self) -> None:
+        endpoint = "http://192.168.1.20:10000/sony"
+        self.assertTrue(same_url_host("http://192.168.1.20:52323/description.xml", endpoint))
+        self.assertTrue(same_url_host("HTTP://192.168.1.20/description.xml", endpoint))
+        self.assertFalse(same_url_host("http://10.0.0.8/description.xml", endpoint))
+        self.assertFalse(same_url_host("http://192.168.1.20@10.0.0.8/description.xml", endpoint))
+        self.assertFalse(same_url_host("file:///description.xml", endpoint))
 
     def test_playback_state_mapping(self) -> None:
         self.assertEqual(playback_state_name("PLAYING", is_idle=False), "playing")

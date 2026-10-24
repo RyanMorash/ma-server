@@ -105,6 +105,17 @@ def endpoint_key(endpoint: str) -> str:
     return endpoint.strip().rstrip("/")
 
 
+def same_url_host(left: str, right: str) -> bool:
+    """Return True when both HTTP(S) URLs use the same host.
+
+    SSDP ``LOCATION`` and the ScalarWebAPI endpoint are separate URLs. Playback
+    may use a description only when it names the same device host.
+    """
+    left_host = _http_hostname(left)
+    right_host = _http_hostname(right)
+    return left_host is not None and left_host == right_host
+
+
 def is_main_zone(output: str | None) -> bool:
     """Return True for the main zone (``zone=1``) or an output with no zone."""
     if not output or "zone=" not in output:
@@ -172,3 +183,10 @@ def playback_state_name(state: str | None, *, is_idle: bool) -> str | None:
     if is_idle or not normalized:
         return None
     return None
+
+
+def _http_hostname(url: str) -> str | None:
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        return None
+    return parts.hostname

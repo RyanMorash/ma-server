@@ -29,6 +29,7 @@ from .util import (
     is_bravia_device,
     parse_manual_endpoints,
     player_id_from_macs,
+    same_url_host,
 )
 
 if TYPE_CHECKING:
@@ -98,9 +99,20 @@ class SongpalPlayerProvider(PlayerProvider):
             control_urls: dict[str, str | None] = {}
             for candidate in candidates:
                 control_url = None
-                if candidate.upnp_location:
+                # LOCATION and the ScalarWebAPI endpoint come from different
+                # parts of the advertisement. A description on another host can
+                # name the real device while its control URL receives playback.
+                if candidate.upnp_location and same_url_host(
+                    candidate.upnp_location, candidate.endpoint
+                ):
                     control_url = await fetch_avtransport_control_url(
                         self.mass.http_session_no_ssl, candidate.upnp_location
+                    )
+                elif candidate.upnp_location:
+                    self.logger.debug(
+                        "Ignoring UPnP description %s; host does not match SongPal endpoint %s",
+                        candidate.upnp_location,
+                        candidate.endpoint,
                     )
                 control_urls[candidate.endpoint] = control_url
                 if control_url is None:
