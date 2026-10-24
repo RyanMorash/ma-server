@@ -249,10 +249,15 @@ class SongpalPlayerProvider(PlayerProvider):
                 )
                 return
         if existing is not None:
-            # Disable unregisters the player, but this map keeps the instance.
-            # Register it again, and do not listen when it is still disabled.
+            # Disable unregisters the player but keeps this instance. Refresh
+            # the stored enabled flag first: register trusts it, and a stale
+            # True would put the disabled player back and reopen notifications.
             needs_register = self.mass.players.get_player(player_id) is not existing
             if needs_register:
+                existing.sync_stored_enabled()
+                if not existing.state.enabled:
+                    await existing.close()
+                    return
                 existing.allow_listen()
             await existing.update_connection(
                 endpoint=device.endpoint,

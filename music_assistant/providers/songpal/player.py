@@ -355,10 +355,26 @@ class SongpalPlayer(Player):
         """Allow a new notification listener after this player was unloaded."""
         self._closing = False
 
+    def sync_stored_enabled(self) -> None:
+        """Apply the stored enabled flag before a rediscovery register.
+
+        Disable and enable do not call ``set_config`` on the instance this
+        provider keeps. ``PlayerController.register`` skips a player only when
+        that instance already says it is disabled.
+        """
+        stored = self.mass.config.get_base_player_config(self.player_id, self.provider_id)
+        if self.config.enabled == stored.enabled and self.state.enabled == stored.enabled:
+            return
+        self.config.enabled = stored.enabled
+        # ``enabled`` is cached, and ``state.enabled`` is the last calculated
+        # snapshot. Both have to move or register trusts the stale value.
+        self.update_state(signal_event=False, force_update=True)
+
     async def on_unload(self) -> None:
         """Stop notifications when the controller unregisters this player."""
         await super().on_unload()
         await self.close()
+        self.sync_stored_enabled()
 
     async def close(self) -> None:
         """Stop the notification listener."""
