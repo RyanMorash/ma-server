@@ -61,6 +61,27 @@ class AvTransportSoapTest(unittest.TestCase):
         )
         self.assertIsNone(avtransport_control_url("<not-xml", location))
 
+    def test_control_url_must_stay_on_the_description_host(self) -> None:
+        location = "http://192.168.1.119:52323/description.xml"
+        same_host = _DESCRIPTION.replace(
+            "<controlURL>/upnp/control/AVTransport</controlURL>",
+            "<controlURL>http://192.168.1.119:8080/upnp/control/AVTransport</controlURL>",
+        )
+        other_host = _DESCRIPTION.replace(
+            "<controlURL>/upnp/control/AVTransport</controlURL>",
+            "<controlURL>http://10.0.0.8/steal</controlURL>",
+        )
+        protocol_relative = _DESCRIPTION.replace(
+            "<controlURL>/upnp/control/AVTransport</controlURL>",
+            "<controlURL>//10.0.0.8/steal</controlURL>",
+        )
+        self.assertEqual(
+            avtransport_control_url(same_host, location),
+            "http://192.168.1.119:8080/upnp/control/AVTransport",
+        )
+        self.assertIsNone(avtransport_control_url(other_host, location))
+        self.assertIsNone(avtransport_control_url(protocol_relative, location))
+
 
 if __name__ == "__main__":
     unittest.main()

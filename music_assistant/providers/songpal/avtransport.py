@@ -8,7 +8,7 @@ Sony plays a URL with SOAP ``SetAVTransportURI`` then ``Play``, not with
 from __future__ import annotations
 
 import asyncio
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
@@ -100,8 +100,28 @@ def avtransport_control_url(description: str | bytes, description_url: str) -> s
         control = _text(service, "controlURL", ns)
         if not control:
             continue
-        return urljoin(description_url, control.strip())
+        # An absolute control URL replaces the description host. Playback POSTs
+        # the stream URL there, so it has to stay on the device that was fetched.
+        resolved = _control_url_on_description_host(description_url, control.strip())
+        if resolved:
+            return resolved
     return None
+
+
+def _control_url_on_description_host(description_url: str, control: str) -> str | None:
+    """Resolve ``control`` against the description and keep that host.
+
+    :param description_url: UPnP device description URL that was fetched.
+    :param control: ``controlURL`` value from the device XML.
+    """
+    base = urlsplit(description_url)
+    if base.scheme not in {"http", "https"} or not base.hostname:
+        return None
+    resolved = urljoin(description_url, control)
+    parts = urlsplit(resolved)
+    if parts.scheme not in {"http", "https"} or parts.hostname != base.hostname:
+        return None
+    return resolved
 
 
 def _text(service: ElementTree.Element, tag: str, ns: dict[str, str]) -> str | None:
